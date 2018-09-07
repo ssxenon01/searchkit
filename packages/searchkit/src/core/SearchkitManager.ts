@@ -12,6 +12,7 @@ const identity = require("lodash/identity")
 const map = require("lodash/map")
 const isEqual = require("lodash/isEqual")
 const get = require("lodash/get")
+const assign = require("lodash/assign")
 
 
 export interface SearchkitOptions {
@@ -59,9 +60,9 @@ export class SearchkitManager {
   static mock(options = {}):SearchkitManager {
     let searchkit = new SearchkitManager("/", {
       useHistory:false,
-      transport:new MockESTransport(),      
+      transport:new MockESTransport(),
       ...options
-    })    
+    })
     searchkit.setupListeners()
     return searchkit
   }
@@ -93,7 +94,7 @@ export class SearchkitManager {
 		})
     this.translateFunction = constant(undefined)
     this.queryProcessor = identity
-    this.shouldPerformSearch = ()=> true 
+    this.shouldPerformSearch = ()=> true
     this.query = new ImmutableQuery()
     this.emitter = new EventEmitter()
     this.resultsEmitter = new EventEmitter()
@@ -221,23 +222,42 @@ export class SearchkitManager {
     this.query = query
     this.loading = true
     this.emitter.trigger()
-    let queryObject = this.queryProcessor(this.query.getJSON())
+    let queryJson = this.query.getJSON()
+    let queryObject = this.queryProcessor(queryJson)
     this.currentSearchRequest && this.currentSearchRequest.deactivate()
     this.currentSearchRequest = new SearchRequest(
-      this.transport, queryObject, this)
+      this.transport, queryObject, this, query)
     return this.currentSearchRequest.run()
       .then(()=> {
         return this.getResultsAndState()
       })
   }
 
-  setResults(results){
-    this.compareResults(this.results, results)
-    this.results = results
-    this.error = null
-    this.accessors.setResults(results)
-    this.onResponseChange()
-    this.resultsEmitter.trigger(this.results)
+  setResults(results, srcQuery?){
+    if (srcQuery && srcQuery.shouldAppendResults()){
+      results.hits = assign({}, results.hits, {
+        hits: [
+          ...this.results.hits.hits,
+          ...results.hits.hits,
+        ],
+        hasChanged: false
+      })
+      let mergedResults = assign({}, this.results, {
+        hits: results.hits
+      })
+      this.results = mergedResults
+      this.error = null
+      this.accessors.setResults(mergedResults)
+      this.onResponseChange()
+      this.resultsEmitter.trigger(this.results)
+    } else {
+      this.compareResults(this.results, results)
+      this.results = results
+      this.error = null
+      this.accessors.setResults(results)
+      this.onResponseChange()
+      this.resultsEmitter.trigger(this.results)
+    }
   }
 
   compareResults(previousResults, results){
@@ -290,7 +310,7 @@ export class SearchkitManager {
     return get(this.results, ["hits", "hasChanged"], true)
   }
 
-  setError(error){
+  setError(error, context){
     this.error = error
     console.error(this.error)
     this.results = null

@@ -101,6 +101,20 @@ export class ImmutableQuery {
     return this.deepUpdate("aggs", aggs)
   }
 
+  removeAggs(){
+    return this.remove("aggs")
+  }
+  shouldAppendResults(){
+    return this.index.shouldAppendResults
+  }
+  setShouldAppendResults(shouldAppendResults: boolean){
+    return this.update({ $merge: { shouldAppendResults } })
+  }
+  remove(key) {
+    return new ImmutableQuery(
+      omit(this.index, key)
+    )
+  }
   getFilters(keys=[]) {
     return this.getFiltersWithoutKeys(keys)
   }

@@ -12,7 +12,7 @@ const find = require("lodash/find")
 type StatefulAccessors = Array<StatefulAccessor<any>>
 
 export class AccessorManager {
-  
+
   accessors:Array<Accessor>
   statefulAccessors:{}
   queryAccessor:BaseQueryAccessor
@@ -58,9 +58,9 @@ export class AccessorManager {
           existingAccessor.incrementRef()
           return existingAccessor
         } else {
-          throw new Error(`Multiple imcompatible components with id='${accessor.key}' existing on the page`)          
+          throw new Error(`Multiple imcompatible components with id='${accessor.key}' existing on the page`)
         }
-        
+
       } else {
         this.statefulAccessors[accessor.key] = accessor
       }
@@ -109,6 +109,7 @@ export class AccessorManager {
     return this.queryAccessor
   }
 
+
   buildSharedQuery(query){
     return reduce(this.getActiveAccessors(), (query, accessor)=>{
       return accessor.buildSharedQuery(query)
@@ -121,10 +122,18 @@ export class AccessorManager {
     }, query)
   }
 
+  postProcessQuery(query){
+    return reduce(this.getActiveAccessors(), (query, accessor)=>{
+      return accessor.postProcessQuery(query)
+    }, query)
+  }
+
   buildQuery(){
     each(this.getActiveAccessors(), accessor => accessor.beforeBuildQuery())
-    return this.buildOwnQuery(
-      this.buildSharedQuery(new ImmutableQuery())
+    return this.postProcessQuery(
+      this.buildOwnQuery(
+        this.buildSharedQuery(new ImmutableQuery())
+      )
     )
   }
 
